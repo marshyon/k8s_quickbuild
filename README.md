@@ -9,7 +9,7 @@ Ansible tower is not used here, rather it uses a 'workstation' from which the an
 
 Ubuntu 1804 LTS is the target to be configured. Other flavours of Linux operating systems are available.
 
-for the implatient like me the working code for this is to be found at [TODO: LINK TO WORKING CODE HERE]( TODO )
+for the implatient like me the working code for this is to be found at [this repo on Github](https://github.com/marshyon/k8s_quickbuild)
 
 install pre-requistites with 
 
