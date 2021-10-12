@@ -285,21 +285,17 @@ we run the playbook with
 ansible-playbook --limit k8smaster -e "ansible_sudo_pass=${ansible_sudo}" site.yml 
 ```
 
-# INSTALL cks-master
-gcloud compute ssh cks-master
-sudo -i
-bash <(curl -s https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_master.sh)
-
-
-# INSTALL cks-worker
-gcloud compute ssh cks-worker
-sudo -i
-bash <(curl -s https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_worker.sh)
-
-
 # k8s cluster config
 
 ```
 ansible-galaxy install geerlingguy.swap
 ```
 
+# References
+
+the following resources were used to buld this script from the killer-sh repo :
+
+```
+https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_master.sh
+https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_worker.sh
+```
