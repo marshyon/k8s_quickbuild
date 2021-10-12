@@ -1,0 +1,3 @@
+---
+swap_file_state: absent
+KUBE_VERSION: 1.21.0

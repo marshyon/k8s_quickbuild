@@ -1,0 +1,149 @@
+---
+- hosts: all
+  become: true
+  vars_files:
+    - vars/default.yml
+  tasks:
+    - name: Common packages
+      apt:
+        pkg:
+          - curl
+          - software-properties-common
+          - python3-pip
+          - net-tools
+          - vim
+          - etcd-client 
+          - build-essential
+        state: latest
+        update_cache: true
+    - name: Disable SWAP in fstab since kubernetes can't work with swap enabled
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+    - name: Add an Apt signing key, packages.cloud.google.com, uses whichever key is at the URL
+      ansible.builtin.apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present        
+    - name: Add specified repository into sources list using specified filename
+      ansible.builtin.apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+        filename: kubernetes.list
+    - name: K8s specific packages
+      apt:
+        pkg:
+          - curl
+          - docker.io
+          - "kubelet={{ KUBE_VERSION }}-00" 
+          - "kubeadm={{ KUBE_VERSION }}-00"
+          - "kubectl={{ KUBE_VERSION }}-00"
+          - "kubernetes-cni=0.8.7-00"
+    - name: docker/daemon file 
+      ansible.builtin.copy:
+        content: |
+                  {
+                    "exec-opts": ["native.cgroupdriver=systemd"],
+                    "log-driver": "json-file",
+                    "storage-driver": "overlay2"
+                  }
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Create /etc/systemd/system/docker.service.d if it does not exist
+      ansible.builtin.file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        mode: '0755'    
+    - name: Enable docker service
+      ansible.builtin.systemd:
+        name: docker
+        enabled: yes          
+    - name: restart docker service
+      ansible.builtin.systemd:
+        state: reloaded
+        name: docker          
+    - name: Enable kubelet service
+      ansible.builtin.systemd:
+        name: kubelet
+        enabled: yes          
+    - name: start kubelet service
+      ansible.builtin.systemd:
+        state: started
+        name: kubelet          
+  roles:
+    - geerlingguy.swap
+
+- hosts: k8smaster
+  become: true
+  vars_files:
+    - vars/default.yml
+  tasks:
+    - name: Check if /root/weave.sh exists
+      stat:
+        path: /root/weave.sh
+      register: weave_script_stat_result
+    - debug: var=weave_script_stat_result['stat']['exists']
+    - name: Set k8s master hostname
+      ansible.builtin.hostname:
+        name: "{{ hostname }}"
+    - name: Create /root/.kube if it does not exist
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'    
+    - name: Reset (destroy) the Kubernetes cluster using kubeadm when set in varibles
+      command: kubeadm reset -f
+      when: not weave_script_stat_result['stat']['exists']
+    - name: Initialize the Kubernetes cluster using kubeadm
+      command: "kubeadm init --kubernetes-version={{ KUBE_VERSION }} --ignore-preflight-errors=NumCPU --skip-token-print"
+      when: not weave_script_stat_result['stat']['exists']
+    - name: copy etc k8s config
+      command: cp /etc/kubernetes/admin.conf /root/.kube/config
+    - name: weave script file 
+      ansible.builtin.copy:
+        content: |
+                  KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+        dest: /root/weave.sh
+        owner: root
+        group: root
+        mode: '0755'
+    - name: run apply weave 
+      shell: "/root/weave.sh"
+      register: result
+    - debug: var=result
+    - name: get join command
+      shell: "kubeadm token create --print-join-command --ttl 0"
+      register: join_command
+      
+- hosts: k8sworker01
+  become: true
+  vars_files:
+    - vars/default.yml
+  tasks:
+    # this block runs if the weave script did not yet exist on the master ( so its a new build ) and when the join command is available ( the cluster has been initialised on the master and the slave can now join it )
+    - block:
+      - name: Set k8s worker01 hostname
+        ansible.builtin.hostname:
+          name: "{{ hostname }}"
+      - name: join command file 
+        copy:
+          content: "{{ hostvars[groups['k8smaster'][0]]['join_command']['stdout'] }}"
+          owner: root
+          group: root
+          mode: '0755'
+          dest: /root/join.sh
+      - name: run join command 
+        shell: /root/join.sh
+        register: result
+        when: hostvars[groups["k8smaster"][0]]['join_command'] is defined
+      - debug: var=result
+        when: hostvars[groups["k8smaster"][0]]['join_command'] is defined
+        # when: hostvars[groups["k8smaster"][0]]['join_command'] is defined
+      when: hostvars[groups["k8smaster"][0]]['join_command'] is defined and not hostvars[groups["k8smaster"][0]]['weave_script_stat_result']['stat']['exists']
+
+
+
+
+
