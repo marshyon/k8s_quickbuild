@@ -7,7 +7,7 @@
       - geerlingguy.swap    
       - marshyon.k8squickbase
   tasks:
-    - name: Set k8s master hostname
+    - name: Set hostname
       ansible.builtin.hostname:
         name: "{{ hostname }}"
     - name: Common packages
