@@ -1,3 +1,4 @@
 ---
 swap_file_state: absent
-KUBE_VERSION: 1.21.0
+KUBE_VERSION: 1.22.2
+#KUBE_VERSION: 1.21.0

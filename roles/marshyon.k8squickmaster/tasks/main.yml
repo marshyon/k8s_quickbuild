@@ -1,0 +1,54 @@
+---
+  - name: Check if /.k8s_has_been_built exists
+    stat:
+      path: /.k8s_has_been_built
+    register: k8s_has_been_built_stat_result
+  - debug: var=k8s_has_been_built_stat_result['stat']['exists']
+
+  - name: Create /root/.kube if it does not exist
+    ansible.builtin.file:
+      path: /root/.kube
+      state: directory
+      mode: '0755'    
+
+  - block:     
+
+    - name: Reset (destroy) the Kubernetes cluster using kubeadm when set in varibles
+      command: kubeadm reset -f
+      when: not k8s_has_been_built_stat_result['stat']['exists']
+
+    - name: kill any running instances of kube
+      shell: "kill -9 $(ps -ef | grep -v grep | grep -w kube | awk '{print $2}')"
+      ignore_errors: yes
+    - name: Initialize the Kubernetes cluster using kubeadm
+      command: "kubeadm init --kubernetes-version={{ KUBE_VERSION }} --ignore-preflight-errors=NumCPU --skip-token-print"
+      # when: not k8s_has_been_built_stat_result['stat']['exists']
+    - name: copy etc k8s config
+      command: cp /etc/kubernetes/admin.conf /root/.kube/config
+    - name: weave script file 
+      ansible.builtin.copy:
+        content: |
+                  KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+        dest: /root/weave.sh
+        owner: root
+        group: root
+        mode: '0755'
+    - name: run apply weave 
+      shell: "/root/weave.sh"
+      register: result
+      when: not k8s_has_been_built_stat_result['stat']['exists']
+    - debug: var=result
+    - name: get join command
+      shell: "kubeadm token create --print-join-command --ttl 0"
+      register: join_command
+
+    when: not k8s_has_been_built_stat_result['stat']['exists']
+
+  - name: create or touch lock file 
+    copy:
+      content: ""
+      dest: /.k8s_has_been_built
+      force: no
+      group: sys
+      owner: root
+      mode: 0555    

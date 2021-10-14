@@ -1,0 +1,196 @@
+---
+  - name: Disable SWAP in fstab since kubernetes can't work with swap enabled
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+      replace: '# \1'
+
+  - name: Check if /.k8s_has_been_built exists
+    stat:
+      path: /.k8s_has_been_built
+    register: k8s_has_been_built_stat_result
+    
+  - debug: var=k8s_has_been_built_stat_result['stat']['exists']
+
+
+  - block:
+    - name: remove k8s packages if present
+      apt:
+        pkg:
+          - docker.io 
+          - containerd 
+          - kubelet 
+          - kubeadm 
+          - kubectl 
+          - kubernetes-cni
+        state: absent          
+        update_cache: true
+
+    - name: Remove useless packages from the cache
+      apt:
+        autoclean: yes
+
+    - name: Remove dependencies that are no longer required
+      apt:
+          autoremove: yes
+    - name: Add an Apt signing key, packages.cloud.google.com, uses whichever key is at the URL
+      ansible.builtin.apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present       
+
+    - name: Add specified repository into sources list using specified filename
+      ansible.builtin.apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+        filename: /etc/apt/sources.list.d/kubernetes.list
+
+    - name: K8s specific packages
+      apt:
+        pkg:
+          - curl
+          - docker.io
+          - containerd 
+          - "kubelet={{ KUBE_VERSION }}-00" 
+          - "kubeadm={{ KUBE_VERSION }}-00"
+          - "kubectl={{ KUBE_VERSION }}-00"
+          - kubernetes-cni
+        state: present
+        update_cache: true
+
+
+    - name: containerd config file 
+      ansible.builtin.copy:
+        content: |
+                  overlay
+                  br_netfilter
+        dest: /etc/modules-load.d/containerd.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: containerd modprobe 
+      community.general.modprobe:
+        name: overlay
+        state: present
+
+    - name: containerd modprobe 
+      community.general.modprobe:
+        name: br_netfilter
+        state: present        
+
+    - name: kubernetes-cri service file 
+      ansible.builtin.copy:
+        content: |
+                  net.bridge.bridge-nf-call-iptables  = 1
+                  net.ipv4.ip_forward                 = 1
+                  net.bridge.bridge-nf-call-ip6tables = 1
+        dest: /etc/sysctl.d/99-kubernetes-cri.conf
+        owner: root
+        group: root
+        mode: '0644'
+      register: kubernetescri_service
+    - shell: sysctl --system
+      become: yes
+      when: kubernetescri_service.changed
+
+
+    - name: Create /etc/containerd if it does not exist
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'  
+
+    - name: containerd config file 
+      ansible.builtin.copy:
+        content: |
+                  disabled_plugins = []
+                  imports = []
+                  oom_score = 0
+                  plugin_dir = ""
+                  required_plugins = []
+                  root = "/var/lib/containerd"
+                  state = "/run/containerd"
+                  version = 2
+
+                  [plugins]
+
+                    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+                      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+                        base_runtime_spec = ""
+                        container_annotations = []
+                        pod_annotations = []
+                        privileged_without_host_devices = false
+                        runtime_engine = ""
+                        runtime_root = ""
+                        runtime_type = "io.containerd.runc.v2"
+
+                        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+                          BinaryName = ""
+                          CriuImagePath = ""
+                          CriuPath = ""
+                          CriuWorkPath = ""
+                          IoGid = 0
+                          IoUid = 0
+                          NoNewKeyring = false
+                          NoPivotRoot = false
+                          Root = ""
+                          ShimCgroup = ""
+                          SystemdCgroup = true
+        
+        dest: /etc/containerd/config.toml
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: crictl.yaml file 
+      ansible.builtin.copy:
+        content: |
+                  runtime-endpoint: unix:///run/containerd/containerd.sock
+        dest: /etc/crictl.yaml
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: kubelet file 
+      ansible.builtin.copy:
+        content: |
+                  KUBELET_EXTRA_ARGS="--container-runtime remote --container-runtime-endpoint unix:///run/containerd/containerd.sock"
+        dest: /etc/default/kubelet
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: podman repo
+      ansible.builtin.apt_repository:
+        repo: ppa:projectatomic/ppa
+
+
+    - name: podman packages
+      apt:
+        pkg:
+          - podman 
+          - containers-common
+
+    - name: podman registries file 
+      ansible.builtin.copy:
+        content: |
+                  [registries.search]
+                  registries = ['docker.io']
+        dest: /etc/containers/registries.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Make sure containerd is enabled and restart
+      ansible.builtin.systemd:
+        state: restarted
+        enabled: yes
+        name: containerd
+
+    - name: start kubelet and enable
+      ansible.builtin.systemd:
+        state: started
+        enabled: yes
+        name: kubelet
+
+    when: not k8s_has_been_built_stat_result['stat']['exists']

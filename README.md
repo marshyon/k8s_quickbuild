@@ -9,7 +9,7 @@ Ansible tower is not used here, rather it uses a 'workstation' from which the an
 
 Ubuntu 1804 LTS is the target to be configured. Other flavours of Linux operating systems are available.
 
-for the implatient like me the working code for this is to be found at [this repo on Github](https://github.com/marshyon/k8s_quickbuild)
+for the implatient like me the working code for this is to be found at [this repo on Github]( https://github.com/marshyon/k8s_quickbuild )
 
 install pre-requistites with 
 
@@ -285,17 +285,26 @@ we run the playbook with
 ansible-playbook --limit k8smaster -e "ansible_sudo_pass=${ansible_sudo}" site.yml 
 ```
 
+
+
+
 # k8s cluster config
 
 ```
 ansible-galaxy install geerlingguy.swap
 ```
 
+# Versions
+
+| tag | notes |
+| --- | --- | 
+| 0.0.1 | initial commit with some documentation and pre-containerd config |
+| 0.1.0 | updated to have containerd as runtime plus podman |
+
+
 # References
 
-the following resources were used to buld this script from the killer-sh repo :
+this script is taken from killer sh build scripts in bash at 
 
-```
-https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_master.sh
-https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_worker.sh
-```
+* https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_master.sh
+* https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_worker.sh

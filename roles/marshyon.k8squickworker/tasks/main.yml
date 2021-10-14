@@ -1,0 +1,60 @@
+---
+  - name: Check if /.k8s_has_been_built exists
+    stat:
+      path: /.k8s_has_been_built
+    register: k8s_has_been_built_stat_result
+  - debug: var=k8s_has_been_built_stat_result['stat']['exists']
+
+  - block:
+  
+    - name: Set k8s worker01 hostname
+      ansible.builtin.hostname:
+        name: "{{ hostname }}"
+    - debug: var=hostvars[groups['k8smaster'][0]]['join_command']
+
+    - name: join command file 
+      copy:
+        content: "{{ hostvars[groups['k8smaster'][0]]['join_command']['stdout'] }}"
+        owner: root
+        group: root
+        mode: '0755'
+        dest: /root/join.sh
+
+       
+    - name: join command file 
+      copy:
+        content: "{{ hostvars[groups['k8smaster'][0]]['join_command']['stdout'] }}"
+        owner: root
+        group: root
+        mode: '0755'
+        dest: /root/join.sh
+      when: hostvars[groups["k8smaster"][0]]['join_command'] is defined  
+    - name: run join command 
+      shell: /root/join.sh
+      register: result
+      when: hostvars[groups["k8smaster"][0]]['join_command'] is defined
+    
+    - name: create / touch lock file 
+      copy:
+        content: ""
+        dest: /.k8s_has_been_built
+        force: no
+        group: sys
+        owner: root
+        mode: 0555   
+
+    when: not k8s_has_been_built_stat_result['stat']['exists']
+    
+    
+    
+    
+
+
+
+
+
+
+
+
+
+

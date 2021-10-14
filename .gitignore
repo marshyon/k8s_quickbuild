@@ -1,2 +1,4 @@
 .env
 hosts
+roles/geerlingguy.swap
+install_master.sh
