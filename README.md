@@ -9,9 +9,15 @@ Ansible tower is not used here, rather it uses a 'workstation' from which the an
 
 Ubuntu 1804 LTS is the target to be configured. Other flavours of Linux operating systems are available.
 
+# Quickstart
+
 for the implatient like me the working code for this is to be found at [this repo on Github]( https://github.com/marshyon/k8s_quickbuild )
 
 install pre-requistites with 
+
+```
+ansible-galaxy collection install community.general
+```
 
 ```
 ansible-galaxy install -r requirements.yml --force
@@ -301,6 +307,47 @@ ansible-galaxy install geerlingguy.swap
 | 0.0.1 | initial commit with some documentation and pre-containerd config |
 | 0.1.0 | updated to have containerd as runtime plus podman |
 
+# Ansible Modules
+
+under the heading 'Quickstart', an Ansible 'collection' was installed with 
+
+```
+ansible-galaxy collection install community.general
+```
+
+this installed a bunch of scripts and 'plugins' into an ansible directory under the home directory of the current user at :
+
+```
+.ansible/collections/ansible_collections/community/general
+```
+the specific 'module' that this script is using is 'modprobe' which can be found at :
+```
+.ansible/collections/ansible_collections/community/general/plugins/modules/modprobe.py
+```
+This is an Ansible plugin written in Python.
+
+Ansible plugins can be written in anything, so log as their outputs are in JSON and of an appropriate form.
+
+This said, Python, being the first choice of Ansible developers as it is the language Ansible is written in, has a number of features and benefits that make it easier to write these plugins and potentially not having to 'write it the hard way' with JSON as standard output.
+
+The documentation for [Building a simple module](https://docs.ansible.com/ansible/2.3/dev_guide/ developing_modules_general.html) talks more specifically about this.
+
+
+## Ansible and Proxmox 
+
+the creation of proxmox hosts from clones of other vms or templates can be achieved using 
+
+https://docs.ansible.com/ansible/latest/collections/community/general/proxmox_kvm_module.html
+
+another 'community' module which is to be found in the above module collection
+
+the module
+
+```
+~/.ansible/collections/ansible_collections/community/general/plugins/modules/cloud/misc/proxmox_kvm.py
+```
+
+managing proxmox hosts and clones for example
 
 # References
 
