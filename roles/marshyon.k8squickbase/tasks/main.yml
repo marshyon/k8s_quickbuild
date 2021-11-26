@@ -48,6 +48,7 @@
       apt:
         pkg:
           - curl
+          - nfs-common
           - docker.io
           - containerd 
           - "kubelet={{ KUBE_VERSION }}-00" 
